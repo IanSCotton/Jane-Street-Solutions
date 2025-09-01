@@ -1,0 +1,410 @@
+import copy
+import random as rd
+import numpy as np
+
+grid_size = 10
+total_size = grid_size + 2
+
+number_enter = 225
+starter_location = [9, 0]  # in y x
+
+grid = [0] * 12
+for i in range(12):
+    grid[i] = [0] * 12
+
+
+def print_grid(grid_to_print):
+    for i in range(12):
+        for j in range(12):
+            print(grid_to_print[j][i], end=" ")
+        print("")
+    print("")
+
+
+class Sequence:
+    def __init__(self, number, grid, move_sequence):
+        self.number = number
+        self.grid = grid
+        self.move_sequence = move_sequence
+
+
+def find_prime_factors(number):  # finds the prime factors of a number
+    prime_factors = []
+    while number > 1:  # until the number has been reduced to 1
+        i = 2
+        while True:
+            if number % i == 0:  # if i is a prime factor
+                prime_factors.append(i)  # add it to the list of prime factors
+                number = number / i  # divide the number by the prime factor
+                break  # go back to lower i
+            i += 1
+    return prime_factors
+
+
+def find_other_combinations(prime_factor_list, new_terms):
+    # try to multiply prime factors with each other
+
+    new = False
+
+    for i in range(len(prime_factor_list)):
+        for j in range(len(prime_factor_list)):
+            if i == j:
+                continue
+            if prime_factor_list[i] * prime_factor_list[j] <= 10:  # if the new factor is less than 10
+                new_term = copy.deepcopy(prime_factor_list)
+                new_number = prime_factor_list[i] * prime_factor_list[j]
+                if i > j:  # if i > j get rid of i first then j
+                    new_term.pop(i)
+                    new_term.pop(j)
+                else:  # if j > i get rid of j first then i
+                    new_term.pop(j)
+                    new_term.pop(i)
+                new_term.append(new_number)  # create the new combination
+
+                if new_term not in new_terms:
+
+                    new_terms.append(new_term)
+                    newest_term = find_other_combinations(new_term, new_terms)
+
+                    if newest_term:
+                        new_terms.append(newest_term)
+                    new = True
+    if new:
+        return new_terms
+
+
+def monte_carlo_factors(list_of_prime_factors):
+    def find_factorial(number):
+        count = 1
+        for i in range(1, number + 1):
+            count = count * i
+        return count
+
+    # find number of lists we need by finding factorial
+    count = find_factorial(len(list_of_prime_factors))
+
+    # now remove duplicates
+    removed_terms = []
+    for terms in list_of_prime_factors:  # go through numbers
+        same_term = 0  # track the number of times the same number appears
+        for terms_2 in list_of_prime_factors:
+            if terms == terms_2:  # if the number is repeated
+                same_term = same_term + 1  # increase the count
+        if terms not in removed_terms:  # if the number hasn't already been accounted for
+            count = count / find_factorial(same_term)  # lower the number of combinations we need to find
+        removed_terms.append(terms)
+
+    lists = []  # create array to hold the list of lists
+    while len(lists) < count:  # until we have n! lists
+        remaining_list = copy.deepcopy(list_of_prime_factors)  # create copy of prime factors
+        new_list = []  # create new list to be added
+        for i in range(len(list_of_prime_factors)):  # go through elements of prime factor list
+            random = rd.randint(0, len(remaining_list) - 1)  # get a random one
+            new_list.append(remaining_list[random])  # add that element
+            remaining_list.pop(random)  # remove it from the list
+        if new_list not in lists:  # if it hasn't been found already
+            lists.append(new_list)  # add it
+
+    return (sorted(lists))
+
+
+def find_combinations(factor_list):
+    # add 1s to start and end
+    new_factor_list = []
+    for i in range(4):  # no 1s, 1 at start, 1 at end, 1 at start and end
+        for lists in factor_list:
+            if i in [1, 2]:
+                new_list = [1]
+            else:
+                new_list = []
+            for elements in lists:
+                new_list.append(elements)  # add elements to new list
+            if i in [2, 3]:
+                new_list.append(1)
+            new_factor_list.append(new_list)
+
+    return new_factor_list
+
+
+def find_final_combinations(distance_list):
+    # find number of combinations
+    combinations = len(distance_list) - 1
+    combinations = 2 ** combinations
+    new_list = []  # create list to hold combinations
+    while len(new_list) < combinations:  # whilst there are more combinations to add
+        newer_list = []  # create list to add new lists
+        for idx, elements in enumerate(distance_list):  # go through the elements
+            newer_list.append(elements)  # add the element
+            if idx == len(distance_list) - 1:  # if it's the last element don't add "u" or "d"
+                continue
+            if rd.randint(1, 2) == 1:  # pick "u"
+                newer_list.append("u")
+            else:
+                newer_list.append("d")  # or "d"
+        if newer_list not in new_list:  # if it's unique then add it
+            new_list.append(newer_list)
+
+    return new_list
+
+
+def find_routes(number):
+    factors = find_prime_factors(number)  # find the prime factors of the number
+
+    full_factors_list = find_other_combinations(factors, [])  # find multiples of the prime factors
+    # remove nulls
+    clean_full_factors_list = []
+    if full_factors_list:
+        for elements in full_factors_list:
+            if elements is not None and isinstance(elements[0], int):
+                clean_full_factors_list.append(elements)
+    clean_full_factors_list.append(factors)
+
+    combinations_of_factors_list = []
+    for factor_lists in clean_full_factors_list:
+        factor_combinations = monte_carlo_factors(factor_lists)  # get all the ways of arranging these factors
+        clean_factor_combinations = []
+        for factors in factor_combinations:
+            clean_factor_combinations.append(factors)
+        combinations_of_factors_list.append(find_combinations(clean_factor_combinations))  # add the ones
+
+    clean_combinations_of_factors_list = []
+    for elements in combinations_of_factors_list:
+        for elem in elements:
+            clean_combinations_of_factors_list.append(elem)
+
+    routed_numbers = []
+    for elements in clean_combinations_of_factors_list:
+        routed_numbers.append(find_final_combinations(elements))  # add the potential locations of mirrors
+    # routed_numbers = routed_numbers[0]
+
+    clean_routed_numbers = []
+    for route in routed_numbers:
+        for r in route:
+            clean_routed_numbers.append(r)
+
+    return clean_routed_numbers
+
+
+def create_sequence(route, start_location, number):
+    this_grid = copy.deepcopy(grid)
+
+    new = True
+
+    j = start_location[0]  # y value
+    i = start_location[1]  # x value
+    current_position = start_location
+    this_grid[i][j] = 2  # set starting location for ease
+
+    direction = [0, 0]
+    if j == 0:  # along top
+        direction = np.array([1, 0])  # go down
+    if j == total_size - 1:  # along bottom
+        direction = np.array([-1, 0])  # go up
+    if i == 0:  # along left
+        direction = np.array([0, 1])  # go right
+    if i == total_size - 1:  # along right
+        direction = np.array([0, -1])  # go left
+
+    for idx, element in enumerate(route):  # max range to prevent infinite loops
+
+        if isinstance(element, int):
+
+            for move in range(element):
+
+                current_position += direction
+
+                # if it's outside the grid break
+                if (current_position[0] < 0 or current_position[0] > grid_size + 1 or
+                        current_position[1] < 0 or current_position[1] > grid_size + 1):
+                    return False
+
+                # if it's 0 too early break
+                if (current_position[0] == 0 or current_position[0] == grid_size + 1 or
+                    current_position[1] == 0 or current_position[1] == grid_size + 1) and not new and idx != len(
+                    route) - 1:
+                    return False
+
+                # print("after", current_position)
+                this_grid[current_position[1]][current_position[0]] = 1  # for number
+                continue
+
+        new = False
+
+        # if this is a mirror
+        if element == "d":  # if we have "\" mirror
+            if direction[0] == 1:  # if we're going downwards
+                direction[0] = 0
+                direction[1] = 1  # go to right
+            elif direction[0] == -1:  # if we're going upwards
+                direction[0] = 0
+                direction[1] = -1  # go to left
+            elif direction[1] == 1:  # if we're going to the right
+                direction[1] = 0
+                direction[0] = 1  # go downwards
+            elif direction[1] == -1:  # if we're going left
+                direction[1] = 0
+                direction[0] = -1  # go up
+            this_grid[current_position[1]][current_position[0]] = "d"  # for number
+
+        if element == "u":  # if we have "/" mirror
+            if direction[0] == 1:  # if we're going downwards
+                direction[0] = 0
+                direction[1] = -1  # go to left
+            elif direction[0] == -1:  # if we're going upwards
+                direction[0] = 0
+                direction[1] = 1  # go to right
+            elif direction[1] == 1:  # if we're going to the right
+                direction[1] = 0
+                direction[0] = -1  # go upwards
+            elif direction[1] == -1:  # if we're going left
+                direction[1] = 0
+                direction[0] = 1  # go downwards
+            this_grid[current_position[1]][current_position[0]] = "u"  # for number
+
+    if current_position[0] in [0, grid_size + 1] and current_position[1] in [0, grid_size + 1] or new:
+        return False
+    if current_position[0] in [0, grid_size + 1] or current_position[1] in [0, grid_size + 1]:
+        return Sequence(number, this_grid, route)
+
+
+def check_sequences(sequence, grid_to_compare):
+    for i in range(12):
+        for j in range(12):
+            # if sequence 1 is going along needs to be empty
+            if sequence.grid[j][i] == 1 and grid_to_compare[j][i] in ["u", "d"]:
+                return False
+            # if there is a mirror it needs to be valid
+            if sequence.grid[j][i] == "u" and grid_to_compare[j][i] in ["d", 1]:
+                return False
+            if sequence.grid[j][i] == "d" and grid_to_compare[j][i] in ["u", 1]:
+                return False
+
+    return True
+
+
+def update_current_grid(sequence, grid_to_update):
+    for i in range(12):
+        for j in range(12):
+            if sequence.grid[j][i] == "u":
+                grid_to_update[j][i] = "u"
+                grid_to_update[j - 1][i] = 1
+                grid_to_update[j + 1][i] = 1
+                grid_to_update[j][i - 1] = 1
+                grid_to_update[j][i + 1] = 1
+
+            if sequence.grid[j][i] == "d":
+                grid_to_update[j][i] = "d"
+                grid_to_update[j - 1][i] = 1
+                grid_to_update[j + 1][i] = 1
+                grid_to_update[j][i - 1] = 1
+                grid_to_update[j][i + 1] = 1
+
+    return grid_to_update
+
+
+start_cords = [[0, 3], [0, 5], [0, 6], [0, 7], [0, 10],
+               [4, 0], [8, 0], [9, 0],
+               [2, 11], [3, 11], [7, 11],
+               [11, 1], [11, 4], [11, 5], [11, 6], [11, 8]]
+start_values = [112, 48, 3087, 9, 1,
+                27, 12, 225,
+                4, 27, 16,
+                2025, 12, 64, 5, 405]
+
+current_grid = [0] * 12
+for i in range(12):
+    current_grid[i] = [0] * 12
+
+value_dictionary = {}
+
+start_dictionary = {}
+valid_values = []
+for i in range(len(start_values)):  # go through all the coordinates
+    routes = find_routes(start_values[i])  # find the possible routes
+
+    sequences_list = []
+    for route in routes:
+        term = create_sequence(route, start_cords[i], start_values[i])
+        if term:  # if it's a valid route add it to the sequence list
+            sequences_list.append(term)
+    start_dictionary[i] = sequences_list
+    valid_values.append(i)
+start_dictionary["grid"] = copy.deepcopy(current_grid)
+
+# get list of valid indexes
+start_dictionary["values"] = valid_values
+
+value_dictionary[0] = start_dictionary
+
+# set current move
+current_move = 1
+
+# go thorough the dictionary of the most recent move
+
+while len(value_dictionary[current_move - 1]["values"]) > 0:
+
+    print("move:", current_move, len(value_dictionary[current_move - 1]["values"]))
+
+    # find the index that has the smallest number of possible moves
+    smallest_i = 1000
+    smallest_val = 1000
+    counter = 0
+    smallest_counter = 1000
+    for i in value_dictionary[current_move - 1]["values"]:  # go through the possible number to tick off
+        # if the number of sequences is less than the smallest number of sequences previously then update it
+        if len(value_dictionary[current_move - 1][i]) < smallest_val:
+            smallest_i = i
+            smallest_counter = counter
+            smallest_val = len(value_dictionary[current_move - 1][i])
+        counter += 1
+
+    # print("previous:", value_dictionary[current_move-1]["previous"])
+    # print(value_dictionary[current_move - 1][smallest_i])
+    # print_grid(value_dictionary[current_move - 1]["grid"])
+
+    new_grid = update_current_grid(
+        value_dictionary[current_move - 1][smallest_i][rd.randint(0, len(value_dictionary[current_move - 1][smallest_i])-1)],
+        copy.deepcopy(value_dictionary[current_move - 1]["grid"]))
+
+    # find the valid indexes that are left
+    valid_values = copy.deepcopy(value_dictionary[current_move - 1]["values"])   # this is the problem area*****************************
+    print("number removed:", smallest_counter)
+    valid_values.pop(smallest_counter)
+
+    # find the new moves
+    start_dictionary = {}
+    flag = False
+    for i in valid_values:  # go through all the coordinates
+        sequences_list = []
+        for sequence in value_dictionary[current_move - 1][i]:  # go through all the sequences
+            if check_sequences(sequence, new_grid):  # if it's a valid route add it to the sequence list
+                sequences_list.append(sequence)
+
+        # if there are no valid sequences go back
+        if len(sequences_list) == 0:
+            current_move = current_move - 1
+            print("time lord science is elevated on Karn")
+            flag = True
+            break
+
+        print(i, len(sequences_list), sequences_list[0].move_sequence)
+
+        start_dictionary[i] = sequences_list
+
+    if flag:
+        continue
+
+    start_dictionary["grid"] = copy.deepcopy(new_grid)
+    # get list of valid indexes
+    start_dictionary["values"] = valid_values
+    start_dictionary["previous"] = 0
+
+    value_dictionary[current_move] = start_dictionary
+    # if it doesn't work go back and try the next move
+
+    print_grid(value_dictionary[current_move]["grid"])
+    print(value_dictionary[current_move]["values"])
+
+    current_move += 1
+
+
